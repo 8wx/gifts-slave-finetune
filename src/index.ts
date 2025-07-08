@@ -93,6 +93,20 @@ ${json.new_gifts.map((x) => `Id: ${x.id}, Supply: ${x.supply}, Price: ${x.price}
 
       const giftsSortedBySupply = json.new_gifts.sort((a, b) => a.supply - b.supply);
 
+      const blockedGiftIds = [
+        "5168043875654172773",
+        "5170690322832818290",
+        "5170521118301225164",
+        "5170144170496491616",
+        "5170314324215857265",
+        "5170564780938756245",
+        "6028601630662853006",
+        "5170250947678437525",
+        "5168103777563050263",
+        "5170145012310081615",
+        "5170233102089322756",
+      ];
+
       const getGiftQuantity = (supply: number, price: number): number => {
         if (supply <= 2500 && price <= 25000) {
           return 5;
@@ -111,7 +125,13 @@ ${json.new_gifts.map((x) => `Id: ${x.id}, Supply: ${x.supply}, Price: ${x.price}
       };
 
       const giftToBuy = giftsSortedBySupply.find((gift) => {
-        const { supply, price } = gift;
+        const { supply, price, id } = gift;
+        
+        // Skip blocked gift IDs
+        if (blockedGiftIds.includes(id)) {
+          return false;
+        }
+        
         return getGiftQuantity(supply, price) > 0;
       });
 
