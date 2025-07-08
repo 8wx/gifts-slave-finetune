@@ -8,6 +8,7 @@ const envSchema = z.object({
   API_HASH: z.string().min(1),
   BOT_TOKEN: z.string().min(1),
   API_SESSION: z.string().optional(),
+  TARGET: z.enum(["self", "channel"]).default("channel"),
 });
 
 const parsed = envSchema.safeParse(process.env);

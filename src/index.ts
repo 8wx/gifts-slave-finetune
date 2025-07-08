@@ -93,21 +93,26 @@ ${json.new_gifts.map((x) => `Id: ${x.id}, Supply: ${x.supply}, Price: ${x.price}
 
       const giftsSortedBySupply = json.new_gifts.sort((a, b) => a.supply - b.supply);
 
+      const getGiftQuantity = (supply: number, price: number): number => {
+        if (supply <= 2500 && price <= 25000) {
+          return 5;
+        } else if (supply <= 5000 && price <= 25000) {
+          return 10;
+        } else if (supply <= 25000 && price <= 10000) {
+          return 15;
+        } else if (supply <= 50000 && price <= 5000) {
+          return 20;
+        } else if (supply <= 150000 && price <= 2500) {
+          return 25;
+        } else if (price < 500) {
+          return 50;
+        }
+        return 0;
+      };
+
       const giftToBuy = giftsSortedBySupply.find((gift) => {
         const { supply, price } = gift;
-        if (supply <= 2500) {
-          return true;
-        } else if (supply <= 5000 && price <= 25000) {
-          return true;
-        } else if (supply <= 25000 && price <= 10000) {
-          return true;
-        } else if (supply <= 50000 && price <= 5000) {
-          return true;
-        } else if (supply <= 150000 && price <= 2000) {
-          return true;
-        } else if (price < 500) {
-          return true;
-        }
+        return getGiftQuantity(supply, price) > 0;
       });
 
       if (!giftToBuy) {
@@ -115,29 +120,42 @@ ${json.new_gifts.map((x) => `Id: ${x.id}, Supply: ${x.supply}, Price: ${x.price}
         continue;
       }
 
-      let giftsToSend = giftToBuy.supply < 100000 ? 10 : 50;
+      let giftsToSend = getGiftQuantity(giftToBuy.supply, giftToBuy.price);
 
-      const updates = (await client.invoke(
-        new Api.channels.CreateChannel({
-          title: `Gifts ${i}`,
-          about: `My favourite collection of gifts ${i}`,
-        }),
-      )) as Api.Updates;
+      let channel: Channel | null = null;
+      let targetPeer: Api.InputPeerChannel | Api.InputPeerSelf;
 
-      const channel = updates.chats[0] as Channel;
-      await telegraf.telegram.sendMessage(
-        myId,
-        `Создан канал Gifts ${i}, отгружаем на него ${giftsToSend} подарков с id ${giftToBuy.id}.`,
-      );
+      if (env.TARGET === "channel") {
+        const updates = (await client.invoke(
+          new Api.channels.CreateChannel({
+            title: `Gifts ${i}`,
+            about: `My favourite collection of gifts ${i}`,
+          }),
+        )) as Api.Updates;
+
+        channel = updates.chats[0] as Channel;
+        targetPeer = new Api.InputPeerChannel({
+          channelId: channel.id,
+          accessHash: channel.accessHash!,
+        });
+
+        await telegraf.telegram.sendMessage(
+          myId,
+          `Создан канал Gifts ${i}, отгружаем на него ${giftsToSend} подарков с id ${giftToBuy.id}.`,
+        );
+      } else {
+        targetPeer = new Api.InputPeerSelf();
+        await telegraf.telegram.sendMessage(
+          myId,
+          `Отгружаем себе ${giftsToSend} подарков с id ${giftToBuy.id}.`,
+        );
+      }
 
       let isError = false;
 
       while (!isError && giftToBuy && giftsToSend > 0) {
         const invoice = new Api.InputInvoiceStarGift({
-          peer: new Api.InputPeerChannel({
-            channelId: channel.id,
-            accessHash: channel.accessHash!,
-          }),
+          peer: targetPeer,
           giftId: BigInteger(giftToBuy.id),
           hideName: true,
         });
@@ -153,7 +171,10 @@ ${json.new_gifts.map((x) => `Id: ${x.id}, Supply: ${x.supply}, Price: ${x.price}
           giftsToSend--;
         }
       }
-      i++;
+      
+      if (env.TARGET === "channel") {
+        i++;
+      }
     } else {
       await delay(100);
     }
