@@ -108,17 +108,23 @@ ${json.new_gifts.map((x) => `Id: ${x.id}, Supply: ${x.supply}, Price: ${x.price}
       ];
 
       const getGiftQuantity = (supply: number, price: number): number => {
-        if (supply <= 2500 && price <= 25000) {
+        if (supply <= 5000 && price <= 25000) {
+          return 3;
+        } else if (supply <= 15000 && price <= 10000) {
           return 5;
-        } else if (supply <= 5000 && price <= 25000) {
+        } else if (supply <= 25000 && price <= 5000) {
           return 10;
-        } else if (supply <= 25000 && price <= 10000) {
-          return 15;
-        } else if (supply <= 50000 && price <= 5000) {
-          return 20;
-        } else if (supply <= 150000 && price <= 2500) {
-          return 25;
-        } else if (price < 500) {
+        } else if (supply <= 40000 && price <= 2500) {
+          return 10;          
+        } else if (supply <= 80000 && price <= 1000) {
+          return 20;          
+        } else if (supply <= 150000 && price <= 500) {
+          return 30;
+        } else if (supply <= 250000 && price <= 250) {
+          return 40;          
+        } else if (supply <= 500000 && price <= 150) {
+          return 50;
+        } else if (supply <= 1000000 && price <= 50) {
           return 50;
         }
         return 0;
@@ -143,7 +149,7 @@ ${json.new_gifts.map((x) => `Id: ${x.id}, Supply: ${x.supply}, Price: ${x.price}
       let giftsToSend = getGiftQuantity(giftToBuy.supply, giftToBuy.price);
 
       let channel: Channel | null = null;
-      let targetPeer: Api.InputPeerChannel | Api.InputPeerSelf;
+      let targetPeer: Api.InputPeerChannel | Api.InputPeerSelf | Api.InputPeerUser;
 
       if (env.TARGET === "channel") {
         const updates = (await client.invoke(
@@ -163,6 +169,36 @@ ${json.new_gifts.map((x) => `Id: ${x.id}, Supply: ${x.supply}, Price: ${x.price}
           myId,
           `Создан канал Gifts ${i}, отгружаем на него ${giftsToSend} подарков с id ${giftToBuy.id}.`,
         );
+      } else if (env.TARGET === "user") {
+        if (!env.TARGET_USER) {
+          await telegraf.telegram.sendMessage(myId, `Ошибка: TARGET_USER не указан для режима user`);
+          continue;
+        }
+
+        try {
+          const user = await client.invoke(new Api.contacts.ResolveUsername({
+            username: env.TARGET_USER,
+          }));
+
+          if (user.users.length === 0) {
+            await telegraf.telegram.sendMessage(myId, `Ошибка: пользователь @${env.TARGET_USER} не найден`);
+            continue;
+          }
+
+          const targetUser = user.users[0] as Api.User;
+          targetPeer = new Api.InputPeerUser({
+            userId: targetUser.id,
+            accessHash: targetUser.accessHash!,
+          });
+
+          await telegraf.telegram.sendMessage(
+            myId,
+            `Отгружаем пользователю @${env.TARGET_USER} ${giftsToSend} подарков с id ${giftToBuy.id}.`,
+          );
+        } catch (error) {
+          await telegraf.telegram.sendMessage(myId, `Ошибка при поиске пользователя @${env.TARGET_USER}: ${error}`);
+          continue;
+        }
       } else {
         targetPeer = new Api.InputPeerSelf();
         await telegraf.telegram.sendMessage(
